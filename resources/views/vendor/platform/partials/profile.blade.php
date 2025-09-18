@@ -8,8 +8,7 @@
             <span class="text-muted">{{Auth::user()->presenter()->subTitle()}}</span>
         </small>
     </a>
-    <div class="ms-2">
-        <x-orchid-notification/>
-    </div>
+    {{-- Disabled notifications to avoid querying non-existent columns --}}
+    <div class="ms-2"></div>
 </div>
 

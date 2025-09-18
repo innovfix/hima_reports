@@ -60,7 +60,9 @@
     },
     "extra": {
         "laravel": {
-            "dont-discover": []
+            "dont-discover": [
+                "moonshine/moonshine"
+            ]
         }
     },
     "config": {

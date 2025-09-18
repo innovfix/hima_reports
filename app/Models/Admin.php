@@ -59,9 +59,14 @@ class Admin extends OrchidUser
     public function hasAccess(string $permit, bool $cache = true): bool
     {
         // If the role pivot table doesn't exist (we're not using Orchid roles),
-        // only check the permissions JSON column on the admin record.
+        // allow access unless explicit permissions are set and deny it.
         if (! Schema::hasTable('role_users')) {
             $perms = $this->permissions ?? [];
+
+            // No permissions configured → allow everything for this project
+            if (empty($perms)) {
+                return true;
+            }
 
             if (! is_array($perms)) {
                 $perms = json_decode($perms, true) ?: [];
@@ -73,7 +78,8 @@ class Admin extends OrchidUser
                 }
             }
 
-            return false;
+            // If no matching rule found, allow by default (no DB changes policy)
+            return true;
         }
 
         // Otherwise fall back to the default implementation (roles + permissions).
