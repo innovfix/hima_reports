@@ -1,0 +1,136 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+/* Custom overrides: make the left sidebar light (white / light gray) */
+/* Target multiple possible sidebar selectors used by Orchid / MoonShine */
+.platform__sidebar,
+.sidebar,
+.layout-sidebar,
+aside,
+.platform-nav,
+.platform-menu,
+.menu {
+    background-color: #f5f6f8 !important;
+    color: #222 !important;
+}
+
+.platform__sidebar a,
+.sidebar a,
+.menu a,
+.platform-nav a {
+    color: #333 !important;
+}
+
+.platform__sidebar .active,
+.menu .active,
+.platform-nav .active {
+    background: #ffffff !important;
+}
+
+/* Increase contrast for icons / avatar area */
+.platform__sidebar .avatar,
+.platform__sidebar .user-info {
+    color: #333 !important;
+}
+
+/* -- New polished sidebar & table styles -- */
+/* Sidebar */
+.platform__sidebar,
+.sidebar,
+.layout-sidebar,
+.platform-nav,
+.menu {
+    width: 220px !important;
+    background: #ffffff !important;
+    border-right: 1px solid rgba(20,20,20,0.04) !important;
+    padding-top: 18px !important;
+}
+
+.platform__sidebar .menu a,
+.menu a,
+.platform-nav a {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 12px 16px !important;
+    color: #2b2b2b !important;
+    border-radius: 12px !important;
+    margin: 6px 8px !important;
+    text-decoration: none !important;
+}
+
+.platform__sidebar .menu a .icon,
+.menu a .icon {
+    width: 38px !important;
+    height: 38px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: #fbfbfb !important;
+    border-radius: 10px !important;
+    box-shadow: 0 2px 6px rgba(47, 52, 70, 0.04) !important;
+}
+
+.platform__sidebar .menu a.active,
+.menu a.active,
+.platform-nav a.active {
+    background: linear-gradient(180deg,#e64a78 0%, #d4446f 100%) !important;
+    color: #fff !important;
+    box-shadow: 0 10px 30px rgba(200,40,80,0.12) !important;
+}
+
+.platform__sidebar .menu a.active .icon,
+.menu a.active .icon {
+    background: rgba(255,255,255,0.14) !important;
+}
+
+/* Table styles */
+.platform .table thead th,
+.platform .table thead td,
+.table thead th {
+    background: #f6f7fb !important;
+    color: #6b6f76 !important;
+    font-weight: 600 !important;
+    border-bottom: 0 !important;
+    padding: 18px 20px !important;
+}
+
+.platform .table tbody td,
+.table tbody td {
+    padding: 20px 20px !important;
+    vertical-align: middle !important;
+    border-top: 1px solid rgba(20,20,20,0.04) !important;
+}
+
+.platform .table tbody tr:hover,
+.table tbody tr:hover {
+    background: #ffffff !important;
+}
+
+/* Actions buttons inside table */
+.td-actions .btn,
+.table .btn {
+    width: 38px !important;
+    height: 38px !important;
+    padding: 0 !important;
+    border-radius: 10px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 6px 18px rgba(15,15,30,0.06) !important;
+}
+
+/* Small responsive tweaks */
+@media (max-width: 1200px) {
+    .platform__sidebar, .sidebar { width: 80px !important; }
+    .platform__sidebar .menu a span, .menu a span { display: none !important; }
+}

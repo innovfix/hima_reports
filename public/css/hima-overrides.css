@@ -1,0 +1,62 @@
+/* Minimal high-specificity overrides to apply polished sidebar + table styles
+   This file is loaded directly from public so it takes effect without rebuilding assets.
+*/
+@media (prefers-color-scheme: light) {
+  /* Sidebar - target Orchid markup (.aside with bg-dark class) with higher specificity */
+  div.aside, div.aside.bg-dark, .aside, .layout-sidebar, .platform__sidebar, aside {
+    background: #ffffff !important;
+    border-right: 1px solid rgba(20,20,20,0.04) !important;
+    width: 220px !important;
+  }
+
+  /* Specific override for elements that use the .bg-dark utility */
+  .bg-dark.aside, .aside.bg-dark {
+    background: #ffffff !important;
+    color: #2b2b2b !important;
+  }
+
+  .layout-sidebar .nav-link, .platform__sidebar .nav-link, .aside .nav-link, .menu a {
+    padding: 12px 16px !important;
+    border-radius: 12px !important;
+    margin: 6px 8px !important;
+    color: #2b2b2b !important;
+  }
+
+  .layout-sidebar .nav-link.active, .platform__sidebar .nav-link.active, .aside .nav-link.active, .menu a.active {
+    background: linear-gradient(180deg,#e64a78 0%, #d4446f 100%) !important;
+    color: #fff !important;
+  }
+
+  /* Table */
+  .table thead th {
+    background: #f6f7fb !important;
+    color: #6b6f76 !important;
+    font-weight: 600 !important;
+    padding: 18px 20px !important;
+  }
+
+  .table tbody td {
+    padding: 20px 20px !important;
+    vertical-align: middle !important;
+  }
+}
+
+/* Ensure profile and header text in the sidebar is visible on white background */
+.aside .profile-container .text-white,
+.aside .profile-container .text-ellipsis.text-white,
+.aside .profile-container .thumb-sm.avatar {
+  color: #2b2b2b !important;
+}
+
+.aside .profile-container .text-muted {
+  color: #6b6f76 !important;
+}
+
+/* Header / brand inside the aside */
+.aside .header-brand,
+.aside .header-brand p,
+.aside .header-brand a {
+  color: #2b2b2b !important;
+}
+
+
