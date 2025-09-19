@@ -34,14 +34,25 @@ class PayoutDateFilter extends Filter
             return $builder;
         }
 
-        // Build correlated subquery for min(created_at) per user and apply bounds
-        // Compare by DATE(...) so a "to" date includes the whole day (inclusive)
+        // Compute first paid date per user once, then join and filter by date bounds
+        $firstPaidSub = \DB::table('withdrawals')
+            ->selectRaw('user_id, MIN(created_at) as first_paid_date')
+            ->where('status', 1)
+            ->groupBy('user_id');
+
+        $builder->leftJoinSub($firstPaidSub, 'first_paid', function ($join) {
+            $join->on('first_paid.user_id', '=', 'users.id');
+        });
+
+        // Ensure only user columns are selected at this stage
+        $builder->select('users.*');
+
         if (! empty($from)) {
-            $builder->whereRaw("DATE((select min(created_at) from withdrawals where withdrawals.user_id = users.id and status = 'paid')) >= ?", [$from]);
+            $builder->whereDate('first_paid.first_paid_date', '>=', $from);
         }
 
         if (! empty($to)) {
-            $builder->whereRaw("DATE((select min(created_at) from withdrawals where withdrawals.user_id = users.id and status = 'paid')) <= ?", [$to]);
+            $builder->whereDate('first_paid.first_paid_date', '<=', $to);
         }
 
         return $builder;

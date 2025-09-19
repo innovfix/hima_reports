@@ -11,6 +11,8 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Orchid\Platform\Models\User;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Screen;
 use Orchid\Support\Facades\Layout;
@@ -27,6 +29,12 @@ class UserListScreen extends Screen
      */
     public function query(): iterable
     {
+        // Optional debugging: pass debug_sql=1 to log executed SQL statements
+        $debugSql = (bool) request()->boolean('debug_sql');
+        if ($debugSql) {
+            DB::connection()->enableQueryLog();
+        }
+
         $query = User::query()->defaultSort('id', 'desc');
 
         // Eager-load roles when the pivot table exists
@@ -46,7 +54,7 @@ class UserListScreen extends Screen
                 $q->from('withdrawals')
                     ->selectRaw('count(*)')
                     ->whereColumn('withdrawals.user_id', 'users.id')
-                    ->where('status', 'paid');
+                    ->where('status', 1);
             }, 'payouts_count');
 
             // First paid payout date
@@ -54,11 +62,25 @@ class UserListScreen extends Screen
                 $q->from('withdrawals')
                     ->selectRaw('min(created_at)')
                     ->whereColumn('withdrawals.user_id', 'users.id')
-                    ->where('status', 'paid');
+                    ->where('status', 1);
             }, 'first_payout_date');
         }
 
         $users = $query->paginate();
+
+        if ($debugSql) {
+            try {
+                Log::error('UserListScreen SQL', [
+                    'params' => request()->all(),
+                    'toSql' => $query->toSql(),
+                    'bindings' => $query->getBindings(),
+                    'executed' => DB::getQueryLog(),
+                    'count' => $users->total(),
+                ]);
+            } catch (\Throwable $e) {
+                // ignore logging errors
+            }
+        }
 
         return [
             'users' => $users,

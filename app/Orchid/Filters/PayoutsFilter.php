@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Orchid\Filters\Filter;
 use Orchid\Screen\Fields\Select;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 class PayoutsFilter extends Filter
 {
@@ -34,11 +35,23 @@ class PayoutsFilter extends Filter
             return $builder;
         }
 
-        // Use correlated subquery in WHERE to avoid HAVING/grouping issues when wrapped by pagination
+        // Build a grouped subquery once and join it for performant filtering
+        $paidCountsSub = DB::table('withdrawals')
+            ->selectRaw('user_id, COUNT(*) as paid_cnt')
+            ->where('status', 1)
+            ->groupBy('user_id');
+
+        $builder->leftJoinSub($paidCountsSub, 'w_paid', function ($join) {
+            $join->on('w_paid.user_id', '=', 'users.id');
+        });
+
+        // Ensure users.* is selected to avoid ambiguous columns after join
+        $builder->select('users.*');
+
         return match ($val) {
-            '0' => $builder->whereRaw("(select count(*) from withdrawals where withdrawals.user_id = users.id and status = 'paid') = 0"),
-            '1' => $builder->whereRaw("(select count(*) from withdrawals where withdrawals.user_id = users.id and status = 'paid') = 1"),
-            'gt1' => $builder->whereRaw("(select count(*) from withdrawals where withdrawals.user_id = users.id and status = 'paid') > 1"),
+            '0'   => $builder->whereNull('w_paid.paid_cnt'),
+            '1'   => $builder->where('w_paid.paid_cnt', '=', 1),
+            'gt1' => $builder->where('w_paid.paid_cnt', '>', 1),
             default => $builder,
         };
     }
