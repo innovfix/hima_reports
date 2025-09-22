@@ -326,6 +326,12 @@ class TopCreatorsScreen extends Screen
         $currentAudioStatus = request()->get('audio_status', 'all');
         $currentVideoStatus = request()->get('video_status', 'all');
 
+        // Precompute a clean URL to clear filters back to defaults
+        $clearParams = array_diff_key(request()->all(), array_flip([
+            'language', 'audio_status', 'video_status', 'media', 'sort'
+        ]));
+        $clearParams['period'] = 'this_week';
+
         // prepare language column detection early so dropdown items can be colored
         $languageCol = Schema::hasColumn('users', 'language') ? 'language' : (Schema::hasColumn('users', 'lang') ? 'lang' : null);
 
@@ -392,6 +398,12 @@ class TopCreatorsScreen extends Screen
                 ->icon('bs-list')
                 ->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['media' => 'all'])))
                 ->class(request()->get('media') === 'all' ? 'active-link' : ''),
+
+            // Clear filters
+            \Orchid\Screen\Actions\Link::make('Clear')
+                ->icon('bs.x-circle')
+                ->href(url()->current().'?'.http_build_query($clearParams))
+                ->class('language-selected'),
 
             // Audio Status dropdown with indicator
             DropDown::make()
