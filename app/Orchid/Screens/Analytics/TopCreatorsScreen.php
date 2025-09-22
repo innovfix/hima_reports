@@ -165,22 +165,29 @@ class TopCreatorsScreen extends Screen
             if (Schema::hasColumn($callsTable, $c)) { $durationCol = $c; break; }
         }
 
-        // compute days in period for averaging
+        // compute ended-condition for calls and days (for potential use)
         $daysCount = null;
         if ($start && $end) {
             $daysCount = $start->diffInDays($end) + 1;
+        }
+        $endedCondition = '0';
+        if ($durationCol) {
+            $endedCondition = "{$callsTable}.{$durationCol} IS NOT NULL AND {$callsTable}.{$durationCol} <> 0";
+        } elseif ($endCol) {
+            $endedCondition = "{$callsTable}.{$endCol} IS NOT NULL AND {$callsTable}.{$endCol} <> ''";
         }
 
         // Subquery: per-period audio call counts and total duration per creator
         // Count ALL matching calls; compute duration only when possible
         $selects = [$creatorIdCol.' as creator_id', DB::raw('COUNT(*) as weekly_audio_calls')];
+        $selects[] = DB::raw("SUM(CASE WHEN {$endedCondition} THEN 1 ELSE 0 END) as ended_calls");
         if ($durationCol) {
             $selects[] = DB::raw("COALESCE(SUM({$callsTable}.{$durationCol}),0) as total_seconds");
         } elseif ($startCol && $endCol && $dateCol) {
             // compute duration from date + start/end times (handles time-only start/end)
             $startExpr = "CONCAT(DATE({$callsTable}.{$dateCol}),' ', {$callsTable}.{$startCol})";
             $endExpr = "CONCAT(DATE({$callsTable}.{$dateCol}),' ', {$callsTable}.{$endCol})";
-            $selects[] = DB::raw("SUM(CASE WHEN {$callsTable}.{$endCol} IS NOT NULL AND {$callsTable}.{$endCol} <> '' THEN GREATEST(0, TIMESTAMPDIFF(SECOND, {$startExpr}, {$endExpr})) ELSE 0 END) as total_seconds");
+            $selects[] = DB::raw("SUM(CASE WHEN {$endedCondition} THEN GREATEST(0, TIMESTAMPDIFF(SECOND, {$startExpr}, {$endExpr})) ELSE 0 END) as total_seconds");
         } else {
             $selects[] = DB::raw('0 as total_seconds');
         }
@@ -228,30 +235,14 @@ class TopCreatorsScreen extends Screen
         }
 
         $query->addSelect(DB::raw('wk.weekly_audio_calls'));
-
-        $hasDurationSource = $durationCol || ($startCol && $endCol && $dateCol);
-        $avgAlias = $hasDurationSource ? 'avg_minutes_per_day' : 'avg_calls_per_day';
-
-        if ($hasDurationSource) {
-            if ($daysCount) {
-                $query->addSelect(DB::raw("ROUND(wk.total_seconds / {$daysCount} / 60, 2) as {$avgAlias}"));
-            } else {
-                $query->addSelect(DB::raw("ROUND(wk.total_seconds / 60, 2) as {$avgAlias}"));
-            }
-        } else {
-            if ($daysCount) {
-                $query->addSelect(DB::raw("ROUND(wk.weekly_audio_calls / {$daysCount}, 2) as {$avgAlias}"));
-            } else {
-                $query->addSelect(DB::raw("wk.weekly_audio_calls as {$avgAlias}"));
-            }
-        }
+        $query->addSelect(DB::raw("ROUND(CASE WHEN wk.ended_calls > 0 THEN wk.total_seconds / wk.ended_calls / 60 ELSE 0 END, 2) as avg_minutes_per_call"));
 
         if ($genderCol !== null) {
             $query->whereIn(DB::raw('LOWER('.$usersTable.'.'.$genderCol.')'), ['female', 'f']);
         }
 
-        // Default sort: highest average per day first, then by weekly call count
-        $query->orderByDesc($avgAlias)->orderByDesc('wk.weekly_audio_calls');
+        // Default sort: highest average minutes per call first, then by weekly call count
+        $query->orderByDesc('avg_minutes_per_call')->orderByDesc('wk.weekly_audio_calls');
 
         $paginator = $query->paginate(20);
         $paginator->setCollection(
@@ -312,9 +303,9 @@ class TopCreatorsScreen extends Screen
                         return $val == 1 ? "<span class='badge bg-success'>".__('Active')."</span>" : "<span class='badge bg-secondary'>".__('Disabled')."</span>";
                     }),
                 TD::make('weekly_audio_calls', __('Calls This Week'))->sort()->width('160px'),
-                TD::make('avg_minutes_per_day', __('Avg Minutes/Day'))->sort()->width('160px')
+                TD::make('avg_minutes_per_call', __('Avg Minutes/Call'))->sort()->width('160px')
                     ->render(function ($row) {
-                        try { $val = $row->getContent('avg_minutes_per_day'); } catch (\Throwable $e) { $val = is_array($row) ? ($row['avg_minutes_per_day'] ?? null) : null; }
+                        try { $val = $row->getContent('avg_minutes_per_call'); } catch (\Throwable $e) { $val = is_array($row) ? ($row['avg_minutes_per_call'] ?? null) : null; }
                         return $val !== null ? (string)$val : __('N/A');
                     }),
             ]),
