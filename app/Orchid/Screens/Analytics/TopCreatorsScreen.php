@@ -229,9 +229,17 @@ class TopCreatorsScreen extends Screen
         }
         if ($audioStatusCol !== null) {
             $query->addSelect(DB::raw($usersTable.'.'.$audioStatusCol.' as audio_status'));
+            $audioFilter = request()->get('audio_status');
+            if ($audioFilter !== null && $audioFilter !== '' && $audioFilter !== 'all') {
+                $query->where($usersTable.'.'.$audioStatusCol, $audioFilter === 'active' ? 1 : 0);
+            }
         }
         if ($videoStatusCol !== null) {
             $query->addSelect(DB::raw($usersTable.'.'.$videoStatusCol.' as video_status'));
+            $videoFilter = request()->get('video_status');
+            if ($videoFilter !== null && $videoFilter !== '' && $videoFilter !== 'all') {
+                $query->where($usersTable.'.'.$videoStatusCol, $videoFilter === 'active' ? 1 : 0);
+            }
         }
 
         $query->addSelect(DB::raw('wk.weekly_audio_calls'));
@@ -382,6 +390,26 @@ class TopCreatorsScreen extends Screen
                 ->icon('bs-list')
                 ->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['media' => 'all'])))
                 ->class(request()->get('media') === 'all' ? 'active-link' : ''),
+
+            // Audio Status filter
+            DropDown::make('Audio Status')
+                ->icon('bs-volume-up')
+                ->list([
+                    Link::make('All')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['audio_status' => 'all']))),
+                    Link::make('Active')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['audio_status' => 'active']))),
+                    Link::make('Disabled')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['audio_status' => 'disabled']))),
+                ])
+                ->alignRight(),
+
+            // Video Status filter
+            DropDown::make('Video Status')
+                ->icon('bs-camera-video')
+                ->list([
+                    Link::make('All')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['video_status' => 'all']))),
+                    Link::make('Active')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['video_status' => 'active']))),
+                    Link::make('Disabled')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['video_status' => 'disabled']))),
+                ])
+                ->alignRight(),
             // Selected language badge (shows currently applied language filter)
             \Orchid\Screen\Actions\Link::make()
                 ->set('name', new \Illuminate\Support\HtmlString("<span class='language-dot' style='background:#{$selectedColor};display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle;'></span> " . htmlspecialchars((string)$selectedIndicator)))
