@@ -393,27 +393,13 @@ class TopCreatorsScreen extends Screen
                 ->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['media' => 'all'])))
                 ->class(request()->get('media') === 'all' ? 'active-link' : ''),
 
-            // Status selection indicators (pill with colored dot)
-            \Orchid\Screen\Actions\Link::make()
+            // Audio Status dropdown with indicator
+            DropDown::make()
                 ->set('name', new \Illuminate\Support\HtmlString(
                     "<span class='language-dot' style='background:".
                     ($currentAudioStatus === 'active' ? '#28a745' : ($currentAudioStatus === 'disabled' ? '#6c757d' : '#999999')).
                     ";display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle;'></span> Audio: ".ucfirst($currentAudioStatus)
                 ))
-                ->class('language-selected')
-                ->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['audio_status' => $currentAudioStatus]))),
-
-            \Orchid\Screen\Actions\Link::make()
-                ->set('name', new \Illuminate\Support\HtmlString(
-                    "<span class='language-dot' style='background:".
-                    ($currentVideoStatus === 'active' ? '#28a745' : ($currentVideoStatus === 'disabled' ? '#6c757d' : '#999999')).
-                    ";display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle;'></span> Video: ".ucfirst($currentVideoStatus)
-                ))
-                ->class('language-selected')
-                ->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['video_status' => $currentVideoStatus]))),
-
-            // Audio Status filter
-            DropDown::make('Audio Status')
                 ->icon('bs-volume-up')
                 ->list([
                     Link::make('All')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['audio_status' => 'all'])))->class($currentAudioStatus==='all' ? 'active-link' : ''),
@@ -421,9 +407,13 @@ class TopCreatorsScreen extends Screen
                     Link::make('Disabled')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['audio_status' => 'disabled'])))->class($currentAudioStatus==='disabled' ? 'active-link' : ''),
                 ])
                 ->alignRight(),
-
-            // Video Status filter
-            DropDown::make('Video Status')
+            // Video Status dropdown with indicator
+            DropDown::make()
+                ->set('name', new \Illuminate\Support\HtmlString(
+                    "<span class='language-dot' style='background:".
+                    ($currentVideoStatus === 'active' ? '#28a745' : ($currentVideoStatus === 'disabled' ? '#6c757d' : '#999999')).
+                    ";display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle;'></span> Video: ".ucfirst($currentVideoStatus)
+                ))
                 ->icon('bs-camera-video')
                 ->list([
                     Link::make('All')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['video_status' => 'all'])))->class($currentVideoStatus==='all' ? 'active-link' : ''),
