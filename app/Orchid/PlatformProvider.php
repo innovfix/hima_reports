@@ -48,6 +48,11 @@ class PlatformProvider extends OrchidServiceProvider
                 ->icon('bs.wallet')
                 ->route('platform.finance.creators_payout')
                 ->permission('platform.systems.users'),
+
+            Menu::make(__('Top Creators'))
+                ->icon('bs.bar-chart')
+                ->route('platform.analytics.top_creators')
+                ->permission('platform.systems.users'),
         ];
     }
 
