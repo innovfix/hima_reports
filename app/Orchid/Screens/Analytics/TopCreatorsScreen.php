@@ -171,15 +171,16 @@ class TopCreatorsScreen extends Screen
             $daysCount = $start->diffInDays($end) + 1;
         }
 
-        // Subquery: per-period audio call counts and total duration per creator (only completed calls if end column exists)
+        // Subquery: per-period audio call counts and total duration per creator
+        // Count ALL matching calls; compute duration only when possible
         $selects = [$creatorIdCol.' as creator_id', DB::raw('COUNT(*) as weekly_audio_calls')];
         if ($durationCol) {
-            $selects[] = DB::raw("SUM({$callsTable}.{$durationCol}) as total_seconds");
+            $selects[] = DB::raw("COALESCE(SUM({$callsTable}.{$durationCol}),0) as total_seconds");
         } elseif ($startCol && $endCol && $dateCol) {
             // compute duration from date + start/end times (handles time-only start/end)
             $startExpr = "CONCAT(DATE({$callsTable}.{$dateCol}),' ', {$callsTable}.{$startCol})";
             $endExpr = "CONCAT(DATE({$callsTable}.{$dateCol}),' ', {$callsTable}.{$endCol})";
-            $selects[] = DB::raw("SUM(GREATEST(0, TIMESTAMPDIFF(SECOND, {$startExpr}, {$endExpr}))) as total_seconds");
+            $selects[] = DB::raw("SUM(CASE WHEN {$callsTable}.{$endCol} IS NOT NULL AND {$callsTable}.{$endCol} <> '' THEN GREATEST(0, TIMESTAMPDIFF(SECOND, {$startExpr}, {$endExpr})) ELSE 0 END) as total_seconds");
         } else {
             $selects[] = DB::raw('0 as total_seconds');
         }
@@ -188,10 +189,6 @@ class TopCreatorsScreen extends Screen
             ->select($selects)
             ->when($start && $end, fn ($q) => $q->whereBetween($timestampCol, [$start, $end]))
             ->tap(function (QueryBuilder $q) use ($audioWhere) { $audioWhere($q); })
-            ->when($endCol, function ($q) use ($callsTable, $endCol) {
-                // exclude rows where end column is null or empty
-                $q->whereNotNull($callsTable.'.'.$endCol)->where($callsTable.'.'.$endCol, '<>', '');
-            })
             ->groupBy($creatorIdCol);
 
         // Detect columns on users table
@@ -213,7 +210,7 @@ class TopCreatorsScreen extends Screen
                 DB::raw($usersTable.'.'.$nameCol.' as creator_name'),
             ])
             ->leftJoinSub($weeklySub, 'wk', 'wk.creator_id', '=', $usersTable.'.id')
-            ->whereNotNull('wk.weekly_audio_calls');
+            ->where('wk.weekly_audio_calls', '>', 0);
 
         if ($languageCol !== null) {
             $query->addSelect(DB::raw($usersTable.'.'.$languageCol.' as language'));
@@ -233,18 +230,19 @@ class TopCreatorsScreen extends Screen
         $query->addSelect(DB::raw('wk.weekly_audio_calls'));
 
         $hasDurationSource = $durationCol || ($startCol && $endCol && $dateCol);
+        $avgAlias = $hasDurationSource ? 'avg_minutes_per_day' : 'avg_calls_per_day';
 
         if ($hasDurationSource) {
             if ($daysCount) {
-                $query->addSelect(DB::raw("ROUND(wk.total_seconds / {$daysCount} / 60, 2) as avg_minutes_per_day"));
+                $query->addSelect(DB::raw("ROUND(wk.total_seconds / {$daysCount} / 60, 2) as {$avgAlias}"));
             } else {
-                $query->addSelect(DB::raw("ROUND(wk.total_seconds / 60, 2) as avg_minutes_per_day"));
+                $query->addSelect(DB::raw("ROUND(wk.total_seconds / 60, 2) as {$avgAlias}"));
             }
         } else {
             if ($daysCount) {
-                $query->addSelect(DB::raw("ROUND(wk.weekly_audio_calls / {$daysCount}, 2) as avg_calls_per_day"));
+                $query->addSelect(DB::raw("ROUND(wk.weekly_audio_calls / {$daysCount}, 2) as {$avgAlias}"));
             } else {
-                $query->addSelect(DB::raw('wk.weekly_audio_calls as avg_calls_per_day'));
+                $query->addSelect(DB::raw("wk.weekly_audio_calls as {$avgAlias}"));
             }
         }
 
@@ -252,7 +250,8 @@ class TopCreatorsScreen extends Screen
             $query->whereIn(DB::raw('LOWER('.$usersTable.'.'.$genderCol.')'), ['female', 'f']);
         }
 
-        $query->orderByDesc('wk.weekly_audio_calls');
+        // Default sort: highest average per day first, then by weekly call count
+        $query->orderByDesc($avgAlias)->orderByDesc('wk.weekly_audio_calls');
 
         $paginator = $query->paginate(20);
         $paginator->setCollection(
@@ -340,15 +339,14 @@ class TopCreatorsScreen extends Screen
                 } else {
                     $hex = substr(md5($lowerLang), 0, 6);
                 }
-                $label = "<span class='language-dot' style='background:#{$hex};display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle;'></span>".htmlspecialchars((string)$lang);
-                $languageItems[] = Link::make($label)
-                    ->raw()
+                $labelHtml = "<span class='language-dot' style='background:#{$hex};display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle;'></span>".htmlspecialchars((string)$lang);
+                $languageItems[] = Link::make()
+                    ->set('name', new \Illuminate\Support\HtmlString($labelHtml))
                     ->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['language' => $lang])))
                     ->class(strtolower((string)$currentLanguage) === strtolower((string)$lang) ? 'active-link' : '');
             }
             // 'All Languages' item
             $languageItems[] = Link::make('All Languages')
-                ->raw()
                 ->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['language' => 'all'])))
                 ->class($currentLanguage === 'all' ? 'active-link' : '');
         }
@@ -394,9 +392,8 @@ class TopCreatorsScreen extends Screen
                 ->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['media' => 'all'])))
                 ->class(request()->get('media') === 'all' ? 'active-link' : ''),
             // Selected language badge (shows currently applied language filter)
-            // selected language HTML as string (use ->raw() so Orchid doesn't escape it)
-            \Orchid\Screen\Actions\Link::make("<span class='language-dot' style='background:#{$selectedColor};display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle;'></span> " . htmlspecialchars((string)$selectedIndicator))
-                ->raw()
+            \Orchid\Screen\Actions\Link::make()
+                ->set('name', new \Illuminate\Support\HtmlString("<span class='language-dot' style='background:#{$selectedColor};display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle;'></span> " . htmlspecialchars((string)$selectedIndicator)))
                 ->class('language-selected')
                 ->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['language' => $currentLanguage]))),
 
