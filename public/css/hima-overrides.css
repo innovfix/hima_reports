@@ -84,3 +84,16 @@
 .language-selected { padding:6px 10px;border-radius:8px;background:rgba(0,0,0,0.03); }
 
 
+/* Ensure dropdowns opened by Filters are positioned under the toggle and don't overflow */
+.dropdown-menu.dropdown-menu-start {
+  left: 0 !important;
+  right: auto !important;
+  transform: translate3d(0, 8px, 0) !important;
+}
+
+/* Slightly increase z-index so dropdown appears above table content */
+.dropdown-menu {
+  z-index: 1055 !important;
+}
+
+
