@@ -177,10 +177,41 @@ class TopCreatorsScreen extends Screen
             $endedCondition = "{$callsTable}.{$endCol} IS NOT NULL AND {$callsTable}.{$endCol} <> ''";
         }
 
+        // Detect caller column (who initiated the call) to compute repeat callers
+        $possibleCallerCols = ['user_id', 'caller_id', 'from_user_id', 'initiator_id', 'sender_id', 'caller_user_id'];
+        $callerCol = null;
+        foreach ($possibleCallerCols as $c) {
+            if (Schema::hasColumn($callsTable, $c)) { $callerCol = $c; break; }
+        }
+
         // Subquery: per-period audio call counts and total duration per creator
         // Count ALL matching calls; compute duration only when possible
         $selects = [$creatorIdCol.' as creator_id', DB::raw('COUNT(*) as weekly_audio_calls')];
         $selects[] = DB::raw("SUM(CASE WHEN {$endedCondition} THEN 1 ELSE 0 END) as ended_calls");
+
+        // repeat_ended_calls: number of ended calls where the caller has more than 1 ended call
+        if ($callerCol) {
+            // build ended condition for correlated subquery (using alias c2)
+            if ($durationCol) {
+                $endedCondC2 = "c2.{$durationCol} IS NOT NULL AND c2.{$durationCol} <> 0";
+            } elseif ($endCol) {
+                $endedCondC2 = "c2.{$endCol} IS NOT NULL AND c2.{$endCol} <> ''";
+            } else {
+                $endedCondC2 = '0';
+            }
+
+            $timeRange = '';
+            if ($start && $end) {
+                $startStr = $start->toDateTimeString();
+                $endStr = $end->toDateTimeString();
+                $timeRange = " AND c2.{$timestampCol} BETWEEN '{$startStr}' AND '{$endStr}'";
+            }
+
+            $repeatSql = "SUM(CASE WHEN {$endedCondition} AND (SELECT COUNT(*) FROM {$callsTable} c2 WHERE c2.{$creatorIdCol} = {$callsTable}.{$creatorIdCol} AND c2.{$callerCol} = {$callsTable}.{$callerCol} {$timeRange} AND ({$endedCondC2})) > 1 THEN 1 ELSE 0 END) as repeat_ended_calls";
+            $selects[] = DB::raw($repeatSql);
+        } else {
+            $selects[] = DB::raw('0 as repeat_ended_calls');
+        }
         if ($durationCol) {
             $selects[] = DB::raw("COALESCE(SUM({$callsTable}.{$durationCol}),0) as total_seconds");
         } elseif ($startCol && $endCol && $dateCol) {
@@ -244,6 +275,7 @@ class TopCreatorsScreen extends Screen
 
         $query->addSelect(DB::raw('wk.weekly_audio_calls'));
         $query->addSelect(DB::raw("ROUND(CASE WHEN wk.ended_calls > 0 THEN wk.total_seconds / wk.ended_calls / 60 ELSE 0 END, 2) as avg_minutes_per_call"));
+        $query->addSelect(DB::raw('wk.repeat_ended_calls'));
 
         if ($genderCol !== null) {
             $query->whereIn(DB::raw('LOWER('.$usersTable.'.'.$genderCol.')'), ['female', 'f']);
@@ -310,11 +342,16 @@ class TopCreatorsScreen extends Screen
                         try { $val = $row->getContent('video_status'); } catch (\Throwable $e) { $val = is_array($row) ? ($row['video_status'] ?? null) : null; }
                         return $val == 1 ? "<span class='badge bg-success'>".__('Active')."</span>" : "<span class='badge bg-secondary'>".__('Disabled')."</span>";
                     }),
-                TD::make('weekly_audio_calls', __('Calls This Week'))->sort()->width('160px'),
-                TD::make('avg_minutes_per_call', __('Avg Minutes/Call'))->sort()->width('160px')
+                TD::make('weekly_audio_calls', __('Calls This Week'))->sort()->width('140px'),
+                TD::make('avg_minutes_per_call', __('Avg Minutes/Call'))->sort()->width('140px')
                     ->render(function ($row) {
                         try { $val = $row->getContent('avg_minutes_per_call'); } catch (\Throwable $e) { $val = is_array($row) ? ($row['avg_minutes_per_call'] ?? null) : null; }
                         return $val !== null ? (string)$val : __('N/A');
+                    }),
+                TD::make('repeat_ended_calls', __('Repeat Ended Calls'))->sort()->width('160px')
+                    ->render(function ($row) {
+                        try { $val = $row->getContent('repeat_ended_calls'); } catch (\Throwable $e) { $val = is_array($row) ? ($row['repeat_ended_calls'] ?? 0) : 0; }
+                        return (string)($val ?? 0);
                     }),
             ]),
         ];
