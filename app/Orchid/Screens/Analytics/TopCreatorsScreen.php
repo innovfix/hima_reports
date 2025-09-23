@@ -348,7 +348,7 @@ class TopCreatorsScreen extends Screen
                         try { $val = $row->getContent('avg_minutes_per_call'); } catch (\Throwable $e) { $val = is_array($row) ? ($row['avg_minutes_per_call'] ?? null) : null; }
                         return $val !== null ? (string)$val : __('N/A');
                     }),
-                TD::make('repeat_ended_calls', __('Repeat Ended Calls'))->sort()->width('160px')
+                TD::make('repeat_ended_calls', __('Repeat Calls'))->sort()->width('160px')
                     ->render(function ($row) {
                         try { $val = $row->getContent('repeat_ended_calls'); } catch (\Throwable $e) { $val = is_array($row) ? ($row['repeat_ended_calls'] ?? 0) : 0; }
                         return (string)($val ?? 0);
