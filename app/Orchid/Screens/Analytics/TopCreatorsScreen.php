@@ -383,54 +383,27 @@ class TopCreatorsScreen extends Screen
                 ->icon('bs.clock-history')
                 ->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['period' => 'all'])))
                 ->class(request()->get('period') === 'all' ? 'active-link' : ''),
-            // Media filter links (default audio)
-            \Orchid\Screen\Actions\Link::make('Audio')
-                ->icon('bs-volume-up-fill')
-                ->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['media' => 'audio'])))
-                ->class(request()->get('media', 'audio') === 'audio' ? 'active-link' : ''),
-
-            \Orchid\Screen\Actions\Link::make('Video')
-                ->icon('bs-camera-video-fill')
-                ->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['media' => 'video'])))
-                ->class(request()->get('media') === 'video' ? 'active-link' : ''),
-
-            \Orchid\Screen\Actions\Link::make('All')
-                ->icon('bs-list')
-                ->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['media' => 'all'])))
-                ->class(request()->get('media') === 'all' ? 'active-link' : ''),
-
-            // Clear filters
-            \Orchid\Screen\Actions\Link::make('Clear')
-                ->icon('bs.x-circle')
-                ->href(url()->current().'?'.http_build_query($clearParams))
-                ->class('language-selected'),
-
-            // Audio Status dropdown with indicator
-            DropDown::make()
-                ->set('name', new \Illuminate\Support\HtmlString(
-                    "<span class='language-dot' style='background:".
-                    ($currentAudioStatus === 'active' ? '#28a745' : ($currentAudioStatus === 'disabled' ? '#6c757d' : '#999999')).
-                    ";display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle;'></span> Audio: ".ucfirst($currentAudioStatus)
-                ))
-                ->icon('bs-volume-up')
+            // Compact Filters dropdown grouping media, status and clear controls
+            DropDown::make('Filters')
+                ->icon('bs-funnel')
                 ->list([
-                    Link::make('All')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['audio_status' => 'all'])))->class($currentAudioStatus==='all' ? 'active-link' : ''),
-                    Link::make('Active')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['audio_status' => 'active'])))->class($currentAudioStatus==='active' ? 'active-link' : ''),
-                    Link::make('Disabled')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['audio_status' => 'disabled'])))->class($currentAudioStatus==='disabled' ? 'active-link' : ''),
-                ])
-                ->alignRight(),
-            // Video Status dropdown with indicator
-            DropDown::make()
-                ->set('name', new \Illuminate\Support\HtmlString(
-                    "<span class='language-dot' style='background:".
-                    ($currentVideoStatus === 'active' ? '#28a745' : ($currentVideoStatus === 'disabled' ? '#6c757d' : '#999999')).
-                    ";display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle;'></span> Video: ".ucfirst($currentVideoStatus)
-                ))
-                ->icon('bs-camera-video')
-                ->list([
-                    Link::make('All')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['video_status' => 'all'])))->class($currentVideoStatus==='all' ? 'active-link' : ''),
-                    Link::make('Active')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['video_status' => 'active'])))->class($currentVideoStatus==='active' ? 'active-link' : ''),
-                    Link::make('Disabled')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['video_status' => 'disabled'])))->class($currentVideoStatus==='disabled' ? 'active-link' : ''),
+                    // Media
+                    Link::make('Media: Audio')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['media' => 'audio'])))->class(request()->get('media', 'audio') === 'audio' ? 'active-link' : ''),
+                    Link::make('Media: Video')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['media' => 'video'])))->class(request()->get('media') === 'video' ? 'active-link' : ''),
+                    Link::make('Media: All')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['media' => 'all'])))->class(request()->get('media') === 'all' ? 'active-link' : ''),
+                    Link::make('---'),
+                    // Audio status
+                    Link::make('Audio: All')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['audio_status' => 'all'])))->class($currentAudioStatus==='all' ? 'active-link' : ''),
+                    Link::make('Audio: Active')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['audio_status' => 'active'])))->class($currentAudioStatus==='active' ? 'active-link' : ''),
+                    Link::make('Audio: Disabled')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['audio_status' => 'disabled'])))->class($currentAudioStatus==='disabled' ? 'active-link' : ''),
+                    Link::make('---'),
+                    // Video status
+                    Link::make('Video: All')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['video_status' => 'all'])))->class($currentVideoStatus==='all' ? 'active-link' : ''),
+                    Link::make('Video: Active')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['video_status' => 'active'])))->class($currentVideoStatus==='active' ? 'active-link' : ''),
+                    Link::make('Video: Disabled')->href(url()->current().'?'.http_build_query(array_merge(request()->all(), ['video_status' => 'disabled'])))->class($currentVideoStatus==='disabled' ? 'active-link' : ''),
+                    Link::make('---'),
+                    // Clear
+                    Link::make('Clear Filters')->href(url()->current().'?'.http_build_query($clearParams)),
                 ])
                 ->alignRight(),
             // Selected language badge (shows currently applied language filter)
