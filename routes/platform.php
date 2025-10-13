@@ -71,6 +71,7 @@ Route::get('users/export', [UserListScreen::class, 'exportCsv'])
 // Finance > Creators Payout
 use App\Orchid\Screens\Finance\CreatorsPayoutListScreen;
 use App\Orchid\Screens\Analytics\TopCreatorsScreen;
+use App\Orchid\Screens\Reports\FemaleReportsScreen;
 
 Route::screen('creators-payout', CreatorsPayoutListScreen::class)
     ->name('platform.finance.creators_payout')
@@ -84,6 +85,13 @@ Route::screen('top-creators', TopCreatorsScreen::class)
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.index')
         ->push(__('Top Creators'), route('platform.analytics.top_creators')));
+
+// Reports > Female Reports
+Route::screen('female-reports', FemaleReportsScreen::class)
+    ->name('platform.reports.female_reports')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push(__('Female Reports'), route('platform.reports.female_reports')));
 
 // Platform > System > Roles > Role
 Route::screen('roles/{role}/edit', RoleEditScreen::class)

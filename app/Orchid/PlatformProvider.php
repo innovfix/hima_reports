@@ -53,6 +53,11 @@ class PlatformProvider extends OrchidServiceProvider
                 ->icon('bs.bar-chart')
                 ->route('platform.analytics.top_creators')
                 ->permission('platform.systems.users'),
+
+            Menu::make(__('Female Reports'))
+                ->icon('bs.file-earmark-bar-graph')
+                ->route('platform.reports.female_reports')
+                ->permission('platform.systems.users'),
         ];
     }
 
