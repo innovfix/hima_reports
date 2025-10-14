@@ -11,7 +11,7 @@ use Orchid\Screen\Fields\Input;
 use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Repository;
 use Orchid\Support\Facades\Layout;
-use App\Orchid\Layouts\Dashboard\DashboardHourlyTable;
+use App\Orchid\Layouts\Dashboard\DashboardHourlyChart;
 
 class DashboardScreen extends Screen
 {
@@ -226,51 +226,77 @@ class DashboardScreen extends Screen
 
         $hourlyStats = $hourlyStats->values();
 
-        // Calculate cumulative totals
+        // Prepare chart data
+        $labels = [];
+        $registeredData = [];
+        $paidUsersData = [];
+        $paidAmountData = [];
+        $totalAmountData = [];
+        $overallAmountData = [];
+        $overallTotalAmountData = [];
+
         $cumulativeTotal = 0;
         $cumulativeOverall = 0;
-        $tableData = $hourlyStats
-            ->map(function ($item) use (&$cumulativeTotal, &$cumulativeOverall) {
-                $details = collect($item['paid_details'] ?? []);
 
-                $detailList = $details->isEmpty()
-                    ? []
-                    : $details->map(function ($row) {
-                        $amount = (float) ($row['amount'] ?? 0);
-                        $name = $row['name'] ?? ('User #'.$row['user_id']);
-                        return [
-                            'name' => $name,
-                            'amount' => $amount,
-                        ];
-                    })->values()->all();
+        foreach ($hourlyStats as $item) {
+            $labels[] = $item['hour'];
+            $registeredData[] = (int) ($item['registered'] ?? 0);
+            $paidUsersData[] = (int) ($item['paid_users'] ?? 0);
+            
+            $paidAmount = (float) ($item['paid_amount'] ?? 0);
+            $overallAmount = (float) ($item['overall_amount'] ?? 0);
+            
+            $cumulativeTotal += $paidAmount;
+            $cumulativeOverall += $overallAmount;
+            
+            $paidAmountData[] = $paidAmount;
+            $totalAmountData[] = $cumulativeTotal;
+            $overallAmountData[] = $overallAmount;
+            $overallTotalAmountData[] = $cumulativeOverall;
+        }
 
-                $paidAmount = (float) ($item['paid_amount'] ?? 0);
-                $overallAmount = (float) ($item['overall_amount'] ?? 0);
-                $cumulativeTotal += $paidAmount;
-                $cumulativeOverall += $overallAmount;
-
-                return new Repository([
-                    'hour' => $item['hour'] ?? '',
-                    'registered' => $item['registered'] ?? 0,
-                    'paid_users' => $item['paid_users'] ?? 0,
-                    'paid_amount' => $paidAmount,
-                    'total_amount' => $cumulativeTotal,
-                    'overall_amount' => $overallAmount,
-                    'overall_total_amount' => $cumulativeOverall,
-                    'paid_details' => $detailList,
-                ]);
-            })
-            ->values();
+        $chartData = [
+            [
+                'name'   => __('Registrations'),
+                'values' => $registeredData,
+                'labels' => $labels,
+            ],
+            [
+                'name'   => __('Paid Users'),
+                'values' => $paidUsersData,
+                'labels' => $labels,
+            ],
+            [
+                'name'   => __('Paid Amount'),
+                'values' => $paidAmountData,
+                'labels' => $labels,
+            ],
+            [
+                'name'   => __('Total Amount'),
+                'values' => $totalAmountData,
+                'labels' => $labels,
+            ],
+            [
+                'name'   => __('Overall Amount'),
+                'values' => $overallAmountData,
+                'labels' => $labels,
+            ],
+            [
+                'name'   => __('Overall Total Amount'),
+                'values' => $overallTotalAmountData,
+                'labels' => $labels,
+            ],
+        ];
 
         $totals = [
-            'registered' => $hourlyStats->sum('registered'),
-            'paid_users' => $hourlyStats->sum('paid_users'),
-            'paid_amount' => $hourlyStats->sum('paid_amount'),
-            'overall_amount' => $hourlyStats->sum('overall_amount'),
+            'registered' => array_sum($registeredData),
+            'paid_users' => max($paidUsersData) ?: 0, // Max since users can be counted multiple times
+            'paid_amount' => array_sum($paidAmountData),
+            'overall_amount' => array_sum($overallAmountData),
         ];
 
         return [
-            'table' => $tableData,
+            'chart' => $chartData,
             'selected_date' => $dateFilter,
             'totals' => $totals,
         ];
@@ -300,7 +326,8 @@ class DashboardScreen extends Screen
                     ->method('filterByDate'),
             ])->title(__('Filters')),
 
-            DashboardHourlyTable::class,
+            DashboardHourlyChart::make('chart', __('Hourly Dashboard'))
+                ->description(__('Hourly breakdown of registrations, paid users, and amounts throughout the day.')),
         ];
     }
 
