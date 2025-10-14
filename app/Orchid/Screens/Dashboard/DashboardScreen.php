@@ -12,7 +12,6 @@ use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Repository;
 use Orchid\Support\Facades\Layout;
 use App\Orchid\Layouts\Dashboard\DashboardHourlyTable;
-use App\Orchid\Layouts\Dashboard\DashboardTotalsLayout;
 
 class DashboardScreen extends Screen
 {
@@ -34,10 +33,23 @@ class DashboardScreen extends Screen
             ];
         })->keyBy('hour');
 
+        $genderColumn = null;
         if (Schema::hasTable($usersTable)) {
+            foreach (['gender', 'sex', 'Gender'] as $column) {
+                if (Schema::hasColumn($usersTable, $column)) {
+                    $genderColumn = $column;
+                    break;
+                }
+            }
+        }
+
+        $maleValues = ['male', 'm'];
+
+        if (Schema::hasTable($usersTable) && $genderColumn !== null) {
             $registrationQuery = DB::table($usersTable)
                 ->select(DB::raw('DATE_FORMAT(created_at, "%H:00") as hour'), DB::raw('COUNT(*) as count'))
                 ->whereBetween('created_at', [$start, $end])
+                ->whereIn(DB::raw('LOWER('.$usersTable.'.'.$genderColumn.')'), $maleValues)
                 ->groupBy(DB::raw('DATE_FORMAT(created_at, "%H:00")'))
                 ->pluck('count', 'hour');
 
@@ -52,7 +64,16 @@ class DashboardScreen extends Screen
             }
         }
 
-        if (Schema::hasTable($transactionsTable)) {
+        $todayRegisteredMaleIds = collect();
+
+        if (Schema::hasTable($usersTable) && $genderColumn !== null) {
+            $todayRegisteredMaleIds = DB::table($usersTable)
+                ->whereBetween('created_at', [$start, $end])
+                ->whereIn(DB::raw('LOWER('.$usersTable.'.'.$genderColumn.')'), $maleValues)
+                ->pluck('id');
+        }
+
+        if (Schema::hasTable($transactionsTable) && $todayRegisteredMaleIds->isNotEmpty()) {
             $typeColumn = Schema::hasColumn($transactionsTable, 'type') ? 'type' : null;
             $userColumn = Schema::hasColumn($transactionsTable, 'user_id') ? 'user_id' : null;
 
@@ -71,8 +92,8 @@ class DashboardScreen extends Screen
 
             if ($typeColumn && $userColumn && ($amountColumn || $coinsColumn)) {
                 $amountExpression = $amountColumn
-                    ? "{$transactionsTable}.{$amountColumn}"
-                    : ($coinsColumn ? "{$transactionsTable}.{$coinsColumn}" : '0');
+                    ? "t.{$amountColumn}"
+                    : ($coinsColumn ? "t.{$coinsColumn}" : '0');
 
                 $nameColumn = null;
                 if (Schema::hasTable($usersTable)) {
@@ -84,21 +105,28 @@ class DashboardScreen extends Screen
                     }
                 }
 
-                $paymentsQuery = DB::table($transactionsTable)
-                    ->select([
-                        DB::raw('DATE_FORMAT('.$transactionsTable.'.created_at, "%H:00") as hour'),
-                        DB::raw("{$transactionsTable}.{$userColumn} as user_id"),
-                        DB::raw("{$amountExpression} as raw_amount"),
-                    ])
-                    ->whereBetween($transactionsTable.'.created_at', [$start, $end])
-                    ->whereRaw("LOWER({$transactionsTable}.{$typeColumn}) = 'add_coins'");
+                $paymentsQuery = DB::table($transactionsTable.' as t')
+                    ->selectRaw('DATE_FORMAT(t.created_at, "%H:00") as hour')
+                    ->selectRaw('t.'.$userColumn.' as user_id')
+                    ->selectRaw($amountExpression.' as raw_amount')
+                    ->whereBetween('t.created_at', [$start, $end])
+                    ->whereRaw("LOWER(t.{$typeColumn}) = 'add_coins'")
+                    ->whereIn('t.'.$userColumn, $todayRegisteredMaleIds);
 
-                if ($nameColumn) {
-                    $paymentsQuery
-                        ->leftJoin($usersTable, $usersTable.'.id', '=', $transactionsTable.'.'.$userColumn)
-                        ->addSelect(DB::raw("COALESCE({$usersTable}.{$nameColumn}, CONCAT('User #', {$transactionsTable}.{$userColumn})) as user_name"));
+                if (Schema::hasTable($usersTable)) {
+                    $paymentsQuery->leftJoin($usersTable.' as u', 'u.id', '=', 't.'.$userColumn);
+
+                    if ($genderColumn !== null) {
+                        $paymentsQuery->whereIn(DB::raw('LOWER(u.'.$genderColumn.')'), $maleValues);
+                    }
+
+                    if ($nameColumn !== null) {
+                        $paymentsQuery->addSelect(DB::raw('COALESCE(u.'.$nameColumn.', CONCAT("User #", t.'.$userColumn.')) as user_name'));
+                    } else {
+                        $paymentsQuery->addSelect(DB::raw('CONCAT("User #", t.'.$userColumn.') as user_name'));
+                    }
                 } else {
-                    $paymentsQuery->addSelect(DB::raw("CONCAT('User #', {$transactionsTable}.{$userColumn}) as user_name"));
+                    $paymentsQuery->addSelect(DB::raw('CONCAT("User #", t.'.$userColumn.') as user_name'));
                 }
 
                 $payments = $paymentsQuery->get()->groupBy('hour');
@@ -142,55 +170,38 @@ class DashboardScreen extends Screen
 
         $hourlyStats = $hourlyStats->values();
 
-        $labels = $hourlyStats->pluck('hour')->toArray();
-        $registrationSeries = $hourlyStats->pluck('registered')->toArray();
-        $paidSeries = $hourlyStats->pluck('paid_users')->toArray();
-        $amountSeries = $hourlyStats->pluck('paid_amount')->map(fn ($value) => round((float) $value, 2))->toArray();
-
-        $chartData = [
-            'labels' => $labels,
-            'datasets' => [
-                [
-                    'name' => 'New Registrations',
-                    'values' => $registrationSeries,
-                ],
-                [
-                    'name' => 'Paid Users',
-                    'values' => $paidSeries,
-                ],
-                [
-                    'name' => 'Paid Amount (₹)',
-                    'values' => $amountSeries,
-                ],
-            ],
-        ];
-
         $tableData = $hourlyStats
             ->map(function ($item) {
                 $details = collect($item['paid_details'] ?? []);
 
-                return array_merge($item, [
-                    'paid_amount' => number_format((float) $item['paid_amount'], 2),
-                    'paid_details' => $details->isEmpty()
-                        ? '-'
-                        : $details->map(function ($row) {
-                            $amount = number_format((float) ($row['amount'] ?? 0), 2);
-                            $name = $row['name'] ?? ('User #'.$row['user_id']);
-                            return $name.' (₹'.$amount.')';
-                        })->implode(', '),
+                $detailList = $details->isEmpty()
+                    ? []
+                    : $details->map(function ($row) {
+                        $amount = (float) ($row['amount'] ?? 0);
+                        $name = $row['name'] ?? ('User #'.$row['user_id']);
+                        return [
+                            'name' => $name,
+                            'amount' => $amount,
+                        ];
+                    })->values()->all();
+
+                return new Repository([
+                    'hour' => $item['hour'] ?? '',
+                    'registered' => $item['registered'] ?? 0,
+                    'paid_users' => $item['paid_users'] ?? 0,
+                    'paid_amount' => (float) ($item['paid_amount'] ?? 0),
+                    'paid_details' => $detailList,
                 ]);
             })
-            ->map(fn ($item) => new Repository($item))
             ->values();
 
         $totals = [
             'registered' => $hourlyStats->sum('registered'),
             'paid_users' => $hourlyStats->sum('paid_users'),
-            'paid_amount' => number_format($hourlyStats->sum('paid_amount'), 2),
+            'paid_amount' => $hourlyStats->sum('paid_amount'),
         ];
 
         return [
-            'chart' => $chartData,
             'table' => $tableData,
             'selected_date' => $dateFilter,
             'totals' => $totals,
@@ -199,12 +210,12 @@ class DashboardScreen extends Screen
 
     public function name(): ?string
     {
-        return __('Dashboard Overview');
+        return __('Male Users Dashboard');
     }
 
     public function description(): ?string
     {
-        return __('Hourly registrations and payouts.');
+        return __('Male registrations and payouts for the selected day.');
     }
 
     public function layout(): iterable
@@ -220,12 +231,6 @@ class DashboardScreen extends Screen
                     ->icon('bs.funnel')
                     ->method('filterByDate'),
             ])->title(__('Filters')),
-
-            Layout::view('platform.dashboard.hourly-chart', [
-                'chart' => $chartData,
-            ]),
-
-            DashboardTotalsLayout::class,
 
             DashboardHourlyTable::class,
         ];

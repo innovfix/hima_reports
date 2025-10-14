@@ -16,36 +16,36 @@ class DashboardHourlyTable extends Table
             TD::make('registered', __('Registrations')),
             TD::make('paid_users', __('Paid Users')),
             TD::make('paid_amount', __('Paid Amount'))->render(function ($row) {
-                $value = 0;
-
                 if (is_object($row) && method_exists($row, 'getContent')) {
                     $value = $row->getContent('paid_amount');
                 } elseif (is_array($row)) {
                     $value = $row['paid_amount'] ?? 0;
-                } elseif (is_object($row)) {
-                    $value = $row->paid_amount ?? ($row->{'paid_amount'} ?? 0);
+                } else {
+                    $value = 0;
                 }
 
                 return '₹ '.number_format((float) $value, 2);
             }),
             TD::make('paid_details', __('Paid Detail'))->render(function ($row) {
-                $value = null;
-
                 if (is_object($row) && method_exists($row, 'getContent')) {
-                    $value = $row->getContent('paid_details');
+                    $details = $row->getContent('paid_details');
                 } elseif (is_array($row)) {
-                    $value = $row['paid_details'] ?? null;
+                    $details = $row['paid_details'] ?? [];
+                } else {
+                    $details = [];
                 }
 
-                if (empty($value) || $value === '-') {
+                if (empty($details)) {
                     return '-';
                 }
 
-                $items = is_array($value) ? $value : explode(',', (string) $value);
+                $items = collect($details)->map(function ($detail) {
+                    $name = $detail['name'] ?? '';
+                    $amount = number_format((float) ($detail['amount'] ?? 0), 2);
+                    return '<li>'.e($name).' (₹ '.$amount.')</li>';
+                })->implode('');
 
-                return '<ul class="list-unstyled mb-0">'.collect($items)->map(function ($item) {
-                    return '<li>'.e(trim($item)).'</li>';
-                })->implode('').' </ul>';
+                return '<ul class="list-unstyled mb-0">'.$items.'</ul>';
             }),
         ];
     }

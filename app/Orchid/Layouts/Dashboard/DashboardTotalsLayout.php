@@ -17,11 +17,11 @@ class DashboardTotalsLayout extends Layout
         $metrics = [
             [
                 'title' => __('Total Registrations'),
-                'value' => $totals['registered'] ?? 0,
+                'value' => number_format((float) ($totals['registered'] ?? 0)),
             ],
             [
                 'title' => __('Total Paid Users'),
-                'value' => $totals['paid_users'] ?? 0,
+                'value' => number_format((float) ($totals['paid_users'] ?? 0)),
             ],
             [
                 'title' => __('Total Paid Amount (₹)'),

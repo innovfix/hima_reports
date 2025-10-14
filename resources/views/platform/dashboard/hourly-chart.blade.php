@@ -1,4 +1,5 @@
 @php
+    $chart = $chart ?? [];
     $labels = $chart['labels'] ?? [];
     $datasets = $chart['datasets'] ?? [];
 @endphp
@@ -23,11 +24,11 @@
             }
 
             const data = {
-                labels: @json($labels),
+                labels: {!! json_encode($labels) !!},
                 datasets: [
                     {
                         label: '{{ __('New Registrations') }}',
-                        data: @json($datasets[0]['values'] ?? []),
+                        data: {!! json_encode($datasets[0]['values'] ?? []) !!},
                         borderColor: '#1f77b4',
                         backgroundColor: 'rgba(31, 119, 180, 0.2)',
                         tension: 0.3,
@@ -35,7 +36,7 @@
                     },
                     {
                         label: '{{ __('Paid Users') }}',
-                        data: @json($datasets[1]['values'] ?? []),
+                        data: {!! json_encode($datasets[1]['values'] ?? []) !!},
                         borderColor: '#ff7f0e',
                         backgroundColor: 'rgba(255, 127, 14, 0.2)',
                         tension: 0.3,
@@ -43,7 +44,7 @@
                     },
                     {
                         label: '{{ __('Paid Amount (₹)') }}',
-                        data: @json($datasets[2]['values'] ?? []),
+                        data: {!! json_encode($datasets[2]['values'] ?? []) !!},
                         borderColor: '#2ca02c',
                         backgroundColor: 'rgba(44, 160, 44, 0.2)',
                         tension: 0.3,
