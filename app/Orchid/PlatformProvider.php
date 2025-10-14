@@ -38,11 +38,17 @@ class PlatformProvider extends OrchidServiceProvider
     {
         // Simplified admin menu: only expose Users for this project
         return [
+            Menu::make(__('Dashboard'))
+                ->icon('bs.speedometer2')
+                ->route('platform.dashboard')
+                ->permission('platform.systems.users')
+                ->title(__('Admin')),
+
             Menu::make(__('Users'))
                 ->icon('bs.people')
                 ->route('platform.systems.users')
                 ->permission('platform.systems.users')
-                ->title(__('Admin')),
+                ->title(__('Management')),
 
             Menu::make(__('Creators Payout'))
                 ->icon('bs.wallet')

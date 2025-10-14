@@ -19,6 +19,7 @@ use App\Orchid\Screens\User\UserListScreen;
 use App\Orchid\Screens\User\UserProfileScreen;
 use Illuminate\Support\Facades\Route;
 use Tabuna\Breadcrumbs\Trail;
+use App\Orchid\Screens\Dashboard\DashboardScreen;
 
 /*
 |--------------------------------------------------------------------------
@@ -35,6 +36,12 @@ use Tabuna\Breadcrumbs\Trail;
 Route::screen('/main', PlatformScreen::class)
     ->name('platform.main')
     ->breadcrumbs(fn (\Tabuna\Breadcrumbs\Trail $trail) => $trail->push(__('Users'), route('platform.systems.users')));
+
+Route::screen('dashboard', DashboardScreen::class)
+    ->name('platform.dashboard')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push(__('Dashboard'), route('platform.dashboard')));
 
 // Platform > Profile
 Route::screen('profile', UserProfileScreen::class)
