@@ -9,6 +9,7 @@ use Orchid\Screen\Screen;
 use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Fields\Input;
 use Orchid\Screen\Actions\Link;
+use Orchid\Screen\Repository;
 use Orchid\Support\Facades\Layout;
 use App\Orchid\Layouts\Dashboard\DashboardHourlyChart;
 use App\Orchid\Layouts\Dashboard\DashboardHourlyTable;
@@ -123,11 +124,14 @@ class DashboardScreen extends Screen
             ],
         ];
 
-        $tableData = $hourlyStats->map(function ($item) {
-            return array_merge($item, [
-                'paid_amount' => number_format((float) $item['paid_amount'], 2),
-            ]);
-        });
+        $tableData = $hourlyStats
+            ->map(function ($item) {
+                return array_merge($item, [
+                    'paid_amount' => number_format((float) $item['paid_amount'], 2),
+                ]);
+            })
+            ->map(fn ($item) => new Repository($item))
+            ->values();
 
         $totals = [
             'registered' => $hourlyStats->sum('registered'),
