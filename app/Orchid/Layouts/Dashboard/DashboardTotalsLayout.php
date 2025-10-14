@@ -2,16 +2,17 @@
 
 namespace App\Orchid\Layouts\Dashboard;
 
-use Orchid\Screen\Layouts\Layout;
-use Orchid\Support\Facades\Layout as LayoutBuilder;
+use Orchid\Screen\Layout;
+use Orchid\Screen\Repository;
+use Orchid\Support\Facades\Layout as LayoutFacade;
 
 class DashboardTotalsLayout extends Layout
 {
     protected $target = 'totals';
 
-    protected function build(): array
+    public function build(Repository $repository): iterable
     {
-        $totals = $this->query->getContent($this->target) ?? [];
+        $totals = $repository->getContent($this->target) ?? [];
 
         $metrics = [
             [
@@ -29,7 +30,7 @@ class DashboardTotalsLayout extends Layout
         ];
 
         return [
-            LayoutBuilder::view('platform.dashboard.totals', [
+            LayoutFacade::view('platform.dashboard.totals', [
                 'metrics' => $metrics,
             ]),
         ];

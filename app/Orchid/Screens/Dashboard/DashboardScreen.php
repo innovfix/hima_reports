@@ -11,7 +11,6 @@ use Orchid\Screen\Fields\Input;
 use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Repository;
 use Orchid\Support\Facades\Layout;
-use App\Orchid\Layouts\Dashboard\DashboardHourlyChart;
 use App\Orchid\Layouts\Dashboard\DashboardHourlyTable;
 use App\Orchid\Layouts\Dashboard\DashboardTotalsLayout;
 
@@ -222,9 +221,9 @@ class DashboardScreen extends Screen
                     ->method('filterByDate'),
             ])->title(__('Filters')),
 
-            Layout::block(DashboardHourlyChart::class)
-                ->title(__('Hourly Overview'))
-                ->description(__('New registrations and paid users per hour.')),
+            Layout::view('platform.dashboard.hourly-chart', [
+                'chart' => $chartData,
+            ]),
 
             DashboardTotalsLayout::class,
 
