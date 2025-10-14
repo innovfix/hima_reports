@@ -40,11 +40,14 @@ class DashboardScreen extends Screen
                 ->groupBy(DB::raw('DATE_FORMAT(created_at, "%H:00")'))
                 ->pluck('count', 'hour');
 
-            foreach ($registrationQuery as $hour => $count) {
-                $hourKey = sprintf('%s', $hour);
-                if ($hourlyStats->has($hourKey)) {
-                    $hourlyStats[$hourKey]['registered'] = (int) $count;
-                }
+            if ($registrationQuery->isNotEmpty()) {
+                $hourlyStats = $hourlyStats->map(function ($slot) use ($registrationQuery) {
+                    $hourKey = $slot['hour'];
+                    if ($registrationQuery->has($hourKey)) {
+                        $slot['registered'] = (int) $registrationQuery->get($hourKey, 0);
+                    }
+                    return $slot;
+                });
             }
         }
 
@@ -53,45 +56,69 @@ class DashboardScreen extends Screen
             $userColumn = Schema::hasColumn($transactionsTable, 'user_id') ? 'user_id' : null;
 
             $amountColumn = null;
+            $coinsColumn = null;
             foreach (['amount', 'coins', 'value'] as $candidate) {
                 if (Schema::hasColumn($transactionsTable, $candidate)) {
-                    $amountColumn = $candidate;
+                    if ($candidate === 'coins') {
+                        $coinsColumn = $candidate;
+                    } else {
+                        $amountColumn = $candidate;
+                    }
                     break;
                 }
             }
 
-            if ($typeColumn && $userColumn && $amountColumn) {
+            if ($typeColumn && $userColumn && ($amountColumn || $coinsColumn)) {
                 $paymentsQuery = DB::table($transactionsTable)
                     ->select(
                         DB::raw('DATE_FORMAT(created_at, "%H:00") as hour'),
                         DB::raw("COUNT(DISTINCT {$userColumn}) as paid_users"),
-                        DB::raw("SUM({$amountColumn}) as paid_amount")
+                        DB::raw(
+                            $amountColumn
+                                ? "SUM({$amountColumn})"
+                                : ($coinsColumn ? "SUM({$coinsColumn})" : '0')
+                        . ' as paid_amount')
                     )
                     ->whereBetween('created_at', [$start, $end])
                     ->whereRaw("LOWER({$typeColumn}) = 'add_coins'")
                     ->groupBy(DB::raw('DATE_FORMAT(created_at, "%H:00")'))
-                    ->get();
+                    ->get()
+                    ->keyBy('hour');
 
-                foreach ($paymentsQuery as $row) {
-                    $hourKey = sprintf('%s', $row->hour);
-                    if ($hourlyStats->has($hourKey)) {
-                        $hourlyStats[$hourKey]['paid_users'] = (int) $row->paid_users;
-                        $hourlyStats[$hourKey]['paid_amount'] = (float) $row->paid_amount;
-                    }
+                if ($paymentsQuery->isNotEmpty()) {
+                    $hourlyStats = $hourlyStats->map(function ($slot) use ($paymentsQuery, $amountColumn, $coinsColumn) {
+                        $hourKey = $slot['hour'];
+                        if ($paymentsQuery->has($hourKey)) {
+                            $row = $paymentsQuery->get($hourKey);
+                            $slot['paid_users'] = (int) ($row->paid_users ?? 0);
+                            $amountValue = (float) ($row->paid_amount ?? 0);
+                            if (!$amountColumn && $coinsColumn) {
+                                $amountValue = $amountValue / 100;
+                            }
+                            $slot['paid_amount'] = $amountValue;
+                        }
+                        return $slot;
+                    });
                 }
             }
         }
 
+        $hourlyStats = $hourlyStats->values();
+
+        $labels = $hourlyStats->pluck('hour')->toArray();
+        $registrationSeries = $hourlyStats->pluck('registered')->toArray();
+        $paidSeries = $hourlyStats->pluck('paid_users')->toArray();
+
         $chartData = [
-            'labels' => $hourlyStats->keys()->toArray(),
+            'labels' => $labels,
             'datasets' => [
                 [
                     'name' => 'New Registrations',
-                    'values' => $hourlyStats->pluck('registered')->toArray(),
+                    'values' => $registrationSeries,
                 ],
                 [
                     'name' => 'Paid Users',
-                    'values' => $hourlyStats->pluck('paid_users')->toArray(),
+                    'values' => $paidSeries,
                 ],
             ],
         ];
@@ -100,7 +127,7 @@ class DashboardScreen extends Screen
             return array_merge($item, [
                 'paid_amount' => number_format((float) $item['paid_amount'], 2),
             ]);
-        })->values();
+        });
 
         $totals = [
             'registered' => $hourlyStats->sum('registered'),

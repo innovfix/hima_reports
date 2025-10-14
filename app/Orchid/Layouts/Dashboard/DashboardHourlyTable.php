@@ -15,7 +15,7 @@ class DashboardHourlyTable extends Table
             TD::make('hour', __('Hour')),
             TD::make('registered', __('Registrations')), 
             TD::make('paid_users', __('Paid Users')),
-            TD::make('paid_amount', __('Paid Amount'))->render(fn ($row) => __('₹ :amount', ['amount' => $row['paid_amount'] ?? '0.00'])),
+            TD::make('paid_amount', __('Paid Amount'))->render(fn ($row) => number_format((float) ($row['paid_amount'] ?? 0), 2)),
         ];
     }
 }
