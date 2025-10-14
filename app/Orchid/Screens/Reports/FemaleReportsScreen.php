@@ -14,7 +14,6 @@ use Orchid\Screen\Screen;
 use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Actions\DropDown;
 use Orchid\Screen\Actions\Button;
-use Orchid\Screen\Fields\DateTimer;
 use Orchid\Screen\Fields\Input;
 use Orchid\Support\Facades\Layout;
 use Orchid\Support\Color;
@@ -117,9 +116,10 @@ class FemaleReportsScreen extends Screen
         // Date column for combining with time-only fields
         $dateCol = Schema::hasColumn($callsTable, 'created_at') ? 'created_at' : null;
 
-        // Get date filters from request
+        // Get filters from request
         $dateFrom = request()->get('date_from');
         $dateTo = request()->get('date_to');
+        $mediaFilter = strtolower((string) request()->get('media', 'all'));
 
         $start = null;
         $end = null;
@@ -220,8 +220,10 @@ class FemaleReportsScreen extends Screen
         // Add call statistics
         $query->addSelect(DB::raw('calls_data.total_calls'));
         $query->addSelect(DB::raw('calls_data.audio_calls'));
+        $query->addSelect(DB::raw('calls_data.audio_duration_seconds'));
         $query->addSelect(DB::raw('ROUND(calls_data.audio_duration_seconds / 60, 2) as audio_call_duration'));
         $query->addSelect(DB::raw('calls_data.video_calls'));
+        $query->addSelect(DB::raw('calls_data.video_duration_seconds'));
         $query->addSelect(DB::raw('ROUND(calls_data.video_duration_seconds / 60, 2) as video_call_duration'));
 
         // Filter by female gender only
@@ -229,8 +231,16 @@ class FemaleReportsScreen extends Screen
             $query->whereIn(DB::raw('LOWER('.$usersTable.'.'.$genderCol.')'), ['female', 'f']);
         }
 
-        // Default sort: highest total calls first
-        $query->orderByDesc('calls_data.total_calls');
+        // Apply media filter ordering
+        if ($mediaFilter === 'audio') {
+            $query->where('calls_data.audio_calls', '>', 0)
+                ->orderByDesc(DB::raw('calls_data.audio_duration_seconds'));
+        } elseif ($mediaFilter === 'video') {
+            $query->where('calls_data.video_calls', '>', 0)
+                ->orderByDesc(DB::raw('calls_data.video_duration_seconds'));
+        } else {
+            $query->orderByDesc('calls_data.total_calls');
+        }
 
         $paginator = $query->paginate(20);
         $paginator->setCollection(
@@ -285,13 +295,7 @@ class FemaleReportsScreen extends Screen
     public function commandBar(): iterable
     {
         $currentLanguage = request()->get('language', 'all');
-        
-        // Build filter query with current values
-        $filterParams = array_filter([
-            'date_from' => request()->get('date_from'),
-            'date_to' => request()->get('date_to'),
-            'language' => request()->get('language'),
-        ]);
+        $currentMedia = strtolower((string) request()->get('media', 'all'));
         
         // Get available languages
         $languageCol = Schema::hasColumn('users', 'language') ? 'language' : (Schema::hasColumn('users', 'lang') ? 'lang' : null);
@@ -335,12 +339,22 @@ class FemaleReportsScreen extends Screen
             $selectedColor = $lowerSel === 'kannada' ? 'a52a2a' : substr(md5($lowerSel), 0, 6);
         }
 
+        $mediaItems = [
+            Link::make('All Media')
+                ->href(url()->current().'?'.http_build_query(array_merge(request()->except('page'), ['media' => 'all'])))
+                ->class($currentMedia === 'all' ? 'active-link' : ''),
+            Link::make('Audio Only')
+                ->href(url()->current().'?'.http_build_query(array_merge(request()->except('page'), ['media' => 'audio'])))
+                ->class($currentMedia === 'audio' ? 'active-link' : ''),
+            Link::make('Video Only')
+                ->href(url()->current().'?'.http_build_query(array_merge(request()->except('page'), ['media' => 'video'])))
+                ->class($currentMedia === 'video' ? 'active-link' : ''),
+        ];
+
         return [
-            // Language dropdown
-            DropDown::make('Language')
-                ->icon('bs-translate')
-                ->list($languageItems)
-                ->alignRight(),
+            DropDown::make('Media')
+                ->icon('bs-broadcast-pin')
+                ->list($mediaItems),
             
             // Selected language badge
             Link::make()
@@ -367,6 +381,7 @@ class FemaleReportsScreen extends Screen
             'date_from' => $filters['date_from'] ?? null,
             'date_to' => $filters['date_to'] ?? null,
             'language' => request()->get('language'),
+            'media' => request()->get('media'),
         ]);
 
         return redirect()->route('platform.reports.female_reports', $params);
