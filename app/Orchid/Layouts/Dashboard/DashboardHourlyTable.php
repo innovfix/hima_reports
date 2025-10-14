@@ -26,27 +26,7 @@ class DashboardHourlyTable extends Table
 
                 return '₹ '.number_format((float) $value, 2);
             }),
-            TD::make('paid_details', __('Paid Detail'))->render(function ($row) {
-                if (is_object($row) && method_exists($row, 'getContent')) {
-                    $details = $row->getContent('paid_details');
-                } elseif (is_array($row)) {
-                    $details = $row['paid_details'] ?? [];
-                } else {
-                    $details = [];
-                }
-
-                if (empty($details)) {
-                    return '-';
-                }
-
-                $items = collect($details)->map(function ($detail) {
-                    $name = $detail['name'] ?? '';
-                    $amount = number_format((float) ($detail['amount'] ?? 0), 2);
-                    return '<li>'.e($name).' (₹ '.$amount.')</li>';
-                })->implode('');
-
-                return '<ul class="list-unstyled mb-0">'.$items.'</ul>';
-            }),
+           
         ];
     }
 }
