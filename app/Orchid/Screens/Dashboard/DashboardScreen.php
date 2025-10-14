@@ -30,6 +30,7 @@ class DashboardScreen extends Screen
                 'registered' => 0,
                 'paid_users' => 0,
                 'paid_amount' => 0,
+                'overall_amount' => 0,
             ];
         })->keyBy('hour');
 
@@ -168,10 +169,68 @@ class DashboardScreen extends Screen
             }
         }
 
+        // Query for overall male users payments (not just today registered)
+        if (Schema::hasTable($transactionsTable) && Schema::hasTable($usersTable) && $genderColumn !== null) {
+            $typeColumn = Schema::hasColumn($transactionsTable, 'type') ? 'type' : null;
+            $userColumn = Schema::hasColumn($transactionsTable, 'user_id') ? 'user_id' : null;
+
+            $amountColumn = null;
+            $coinsColumn = null;
+            foreach (['amount', 'coins', 'value'] as $candidate) {
+                if (Schema::hasColumn($transactionsTable, $candidate)) {
+                    if ($candidate === 'coins') {
+                        $coinsColumn = $candidate;
+                    } else {
+                        $amountColumn = $candidate;
+                    }
+                    break;
+                }
+            }
+
+            if ($typeColumn && $userColumn && ($amountColumn || $coinsColumn)) {
+                $amountExpression = $amountColumn
+                    ? "t.{$amountColumn}"
+                    : ($coinsColumn ? "t.{$coinsColumn}" : '0');
+
+                $overallPaymentsQuery = DB::table($transactionsTable.' as t')
+                    ->selectRaw('DATE_FORMAT(t.created_at, "%H:00") as hour')
+                    ->selectRaw('SUM('.$amountExpression.') as total_amount')
+                    ->whereBetween('t.created_at', [$start, $end])
+                    ->whereRaw("LOWER(t.{$typeColumn}) = 'add_coins'")
+                    ->leftJoin($usersTable.' as u', 'u.id', '=', 't.'.$userColumn)
+                    ->whereIn(DB::raw('LOWER(u.'.$genderColumn.')'), $maleValues)
+                    ->groupBy(DB::raw('DATE_FORMAT(t.created_at, "%H:00")'));
+
+                $overallPayments = $overallPaymentsQuery->get()->keyBy('hour');
+
+                if ($overallPayments->isNotEmpty()) {
+                    $hourlyStats = $hourlyStats->map(function ($slot) use ($overallPayments, $amountColumn, $coinsColumn) {
+                        $hourKey = $slot['hour'];
+                        $overallData = $overallPayments->get($hourKey);
+
+                        if ($overallData) {
+                            $amount = (float) ($overallData->total_amount ?? 0);
+                            if (!$amountColumn && $coinsColumn) {
+                                $amount = $amount / 100;
+                            }
+                            $slot['overall_amount'] = $amount;
+                        } else {
+                            $slot['overall_amount'] = 0;
+                        }
+
+                        return $slot;
+                    });
+                }
+            }
+        }
+
         $hourlyStats = $hourlyStats->values();
 
+        // Calculate cumulative totals
+        $cumulativeTotal = 0;
+        $cumulativeOverall = 0;
         $tableData = $hourlyStats
-            ->map(function ($item) {
+            ->map(function ($item) use (&$cumulativeTotal, &$cumulativeOverall) {
                 $details = collect($item['paid_details'] ?? []);
 
                 $detailList = $details->isEmpty()
@@ -185,11 +244,19 @@ class DashboardScreen extends Screen
                         ];
                     })->values()->all();
 
+                $paidAmount = (float) ($item['paid_amount'] ?? 0);
+                $overallAmount = (float) ($item['overall_amount'] ?? 0);
+                $cumulativeTotal += $paidAmount;
+                $cumulativeOverall += $overallAmount;
+
                 return new Repository([
                     'hour' => $item['hour'] ?? '',
                     'registered' => $item['registered'] ?? 0,
                     'paid_users' => $item['paid_users'] ?? 0,
-                    'paid_amount' => (float) ($item['paid_amount'] ?? 0),
+                    'paid_amount' => $paidAmount,
+                    'total_amount' => $cumulativeTotal,
+                    'overall_amount' => $overallAmount,
+                    'overall_total_amount' => $cumulativeOverall,
                     'paid_details' => $detailList,
                 ]);
             })
@@ -199,6 +266,7 @@ class DashboardScreen extends Screen
             'registered' => $hourlyStats->sum('registered'),
             'paid_users' => $hourlyStats->sum('paid_users'),
             'paid_amount' => $hourlyStats->sum('paid_amount'),
+            'overall_amount' => $hourlyStats->sum('overall_amount'),
         ];
 
         return [

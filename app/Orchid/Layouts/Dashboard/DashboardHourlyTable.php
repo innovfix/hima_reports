@@ -26,6 +26,39 @@ class DashboardHourlyTable extends Table
 
                 return '₹ '.number_format((float) $value, 2);
             }),
+            TD::make('total_amount', __('Total Amount'))->render(function ($row) {
+                if (is_object($row) && method_exists($row, 'getContent')) {
+                    $value = $row->getContent('total_amount');
+                } elseif (is_array($row)) {
+                    $value = $row['total_amount'] ?? 0;
+                } else {
+                    $value = 0;
+                }
+
+                return '₹ '.number_format((float) $value, 2);
+            }),
+            TD::make('overall_amount', __('Overall Amount'))->render(function ($row) {
+                if (is_object($row) && method_exists($row, 'getContent')) {
+                    $value = $row->getContent('overall_amount');
+                } elseif (is_array($row)) {
+                    $value = $row['overall_amount'] ?? 0;
+                } else {
+                    $value = 0;
+                }
+
+                return '₹ '.number_format((float) $value, 2);
+            }),
+            TD::make('overall_total_amount', __('Overall Total Amount'))->render(function ($row) {
+                if (is_object($row) && method_exists($row, 'getContent')) {
+                    $value = $row->getContent('overall_total_amount');
+                } elseif (is_array($row)) {
+                    $value = $row['overall_total_amount'] ?? 0;
+                } else {
+                    $value = 0;
+                }
+
+                return '₹ '.number_format((float) $value, 2);
+            }),
            
         ];
     }
