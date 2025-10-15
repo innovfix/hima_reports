@@ -12,6 +12,7 @@ use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Repository;
 use Orchid\Support\Facades\Layout;
 use App\Orchid\Layouts\Dashboard\DashboardHourlyChart;
+use App\Orchid\Layouts\Dashboard\DashboardHourlyTable;
 
 class DashboardScreen extends Screen
 {
@@ -288,15 +289,30 @@ class DashboardScreen extends Screen
             ],
         ];
 
+        // Prepare table data
+        $tableData = [];
+        foreach ($hourlyStats as $index => $item) {
+            $tableData[] = new Repository([
+                'hour' => $item['hour'] ?? '',
+                'registered' => (int) ($item['registered'] ?? 0),
+                'paid_users' => (int) ($item['paid_users'] ?? 0),
+                'paid_amount' => (float) ($item['paid_amount'] ?? 0),
+                'total_amount' => $totalAmountData[$index] ?? 0,
+                'overall_amount' => (float) ($item['overall_amount'] ?? 0),
+                'overall_total_amount' => $overallTotalAmountData[$index] ?? 0,
+            ]);
+        }
+
         $totals = [
             'registered' => array_sum($registeredData),
-            'paid_users' => max($paidUsersData) ?: 0, // Max since users can be counted multiple times
+            'paid_users' => max($paidUsersData) ?: 0,
             'paid_amount' => array_sum($paidAmountData),
             'overall_amount' => array_sum($overallAmountData),
         ];
 
         return [
             'chart' => $chartData,
+            'table' => $tableData,
             'selected_date' => $dateFilter,
             'totals' => $totals,
         ];
@@ -326,8 +342,10 @@ class DashboardScreen extends Screen
                     ->method('filterByDate'),
             ])->title(__('Filters')),
 
-            DashboardHourlyChart::make('chart', __('Hourly Dashboard'))
-                ->description(__('Hourly breakdown of registrations, paid users, and amounts throughout the day.')),
+            DashboardHourlyChart::make('chart', __('Hourly Dashboard Chart'))
+                ->description(__('Visual representation of hourly trends for registrations, paid users, and amounts throughout the day.')),
+
+            DashboardHourlyTable::class,
         ];
     }
 
